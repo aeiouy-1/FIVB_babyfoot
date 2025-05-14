@@ -3,9 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <title>FIVB Babyfoot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-<header><h1><a href="/">FIVB Babyfoot</a></h1></header>
-<main>{% block content %}{% endblock %}</main>
+    <header>
+      <nav style="padding: 1em; background: #f8f9fa;">
+        <a href="{{ url_for('accueil') }}">Accueil</a> |
+        <a href="{{ url_for('page_hall') }}">Hall of Fame</a> |
+        <a href="{{ url_for('page_regles') }}">Règles</a> |
+        <a href="{{ url_for('page_tournoi') }}">Tournoi Annuel</a> |
+        <a href="{{ url_for('page_ceinture') }}">Ceinture</a> |
+        {% raw %}{% if session.get('admin') %}
+          <a href="{{ url_for('logout') }}">Déconnexion</a>
+        {% else %}
+          <a href="{{ url_for('login') }}">Admin</a>
+        {% endif %}{% endraw %}
+      </nav>
+      <h1 style="text-align:center; margin:20px 0;"><a href="{{ url_for('accueil') }}">FIVB Babyfoot</a></h1>
+    </header>
+    <main>
+      {% raw %}{% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, msg in messages %}
+            <div class="alert {{ category }}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}{% endraw %}
+      {% raw %}{% block content %}{% endblock %}{% endraw %}
+    </main>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

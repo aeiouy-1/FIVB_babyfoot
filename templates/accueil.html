@@ -1,4 +1,35 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Classement</h2>
+  <h2>Classement</h2>
+
+  <!-- Toggle Actifs / Tous -->
+  <form method="get" style="margin:20px 0;">
+    <label style="margin-right:1em;">
+      <input type="radio" name="filter" value="actifs" {% raw %}{% if actifs %}checked{% endif %}{% endraw %} onchange="this.form.submit()">
+      Actifs uniquement
+    </label>
+    <label>
+      <input type="radio" name="filter" value="tous" {% raw %}{% if not actifs %}checked{% endif %}{% endraw %} onchange="this.form.submit()">
+      Tous les joueurs
+    </label>
+  </form>
+
+  <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse: collapse;">
+    <thead style="background:#007bff; color:white;">
+      <tr><th style="padding:8px;">Nom</th><th style="padding:8px;">ELO</th></tr>
+    </thead>
+    <tbody>
+      {% raw %}{% for p in joueurs %}{% endraw %}
+      <tr>
+        <td style="padding:8px;">
+          <a href="{{ url_for('profil_joueur', player_id=p.id) }}">{{ p.nom }}</a>
+          {% raw %}{% if champion_id == p.id %}<span title="Champion actuel"> 🏆</span>{% endif %}{% endraw %}
+        </td>
+        <td style="padding:8px; text-align:center;">
+          {% raw %}{% if p.n_games >= 5 %}{{ p.elo }}{% else %}<em>unranked</em>{% endif %}{% endraw %}
+        </td>
+      </tr>
+      {% raw %}{% endfor %}{% endraw %}
+    </tbody>
+  </table>
 {% endblock %}
