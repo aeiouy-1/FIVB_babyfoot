@@ -3,6 +3,7 @@ from config import Config
 from models import db, Player, Match, BeltHistory
 from utils import calc_elo
 from datetime import datetime
+from functools import wraps
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -111,5 +112,113 @@ def profil_joueur(player_id):
         elo_labels=labels,
         elo_data=data
     )
+# --- Route Hall of Fame ---
+@app.route('/hall-of-fame')
+def hall_of_fame():
+    return render_template('hall_of_fame.html')
 
-# ... (login et admin routes inchangés)
+
+# --- Route Règles ---
+@app.route('/regles')
+def page_regles():
+    return render_template('regles.html')
+
+# --- Route Tournoi Annuel ---
+@app.route('/tournoi-annuel')
+def page_tournoi():
+    return render_template('tournoi_annuel.html')
+
+# --- Route Ceinture ---
+@app.route('/ceinture')
+def page_ceinture():
+    return render_template('ceinture.html')
+
+
+# --- Auth Admin ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        mdp = request.form.get('password')
+        if mdp == app.config['ADMIN_PASSWORD']:
+            session['admin'] = True
+            flash('Connecté en tant qu\'admin', 'success')
+            return redirect(url_for('accueil'))
+        flash('Mot de passe incorrect', 'danger')
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('admin', None)
+    flash('Déconnecté', 'info')
+    return redirect(url_for('accueil'))
+
+# Décorateur pour protéger les routes sensibles
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin'):
+            flash('Accès réservé aux administrateurs', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# --- Routes Admin ---
+@app.route('/admin/ajouter_joueur', methods=['GET', 'POST'])
+@admin_required
+def admin_add_player():
+    if request.method == 'POST':
+        nom = request.form.get('nom', '').strip()
+        if nom:
+            if Player.query.filter_by(nom=nom).first():
+                flash('Ce joueur existe déjà', 'warning')
+            else:
+                db.session.add(Player(nom=nom))
+                db.session.commit()
+                flash(f'Joueur « {nom} » ajouté', 'success')
+                return redirect(url_for('accueil'))
+    return render_template('admin_add_player.html')
+
+@app.route('/admin/ajouter_match', methods=['GET', 'POST'])
+@admin_required
+def admin_add_match():
+    joueurs = Player.query.order_by(Player.nom).all()
+    if request.method == 'POST':
+        j1 = int(request.form.get('player1'))
+        j2 = int(request.form.get('player2'))
+        s1 = int(request.form.get('score1', 0))
+        s2 = int(request.form.get('score2', 0))
+        c1 = request.form.get('color1')
+        # Validation
+        if j1 == j2 or max(s1, s2) != 10:
+            flash('Données de match invalides', 'danger')
+        else:
+            p1 = Player.query.get(j1)
+            p2 = Player.query.get(j2)
+            # Calcul ELO
+            new_elo1, new_elo2 = calc_elo(p1.elo, p2.elo, s1, s2)
+            p1.elo, p2.elo = new_elo1, new_elo2
+            p1.n_games += 1; p2.n_games += 1
+            # Stats victoires/défaites & couleurs
+            if s1 > s2:
+                p1.wins += 1; p2.losses += 1; p1.win_streak += 1; p2.win_streak = 0
+            else:
+                p2.wins += 1; p1.losses += 1; p2.win_streak += 1; p1.win_streak = 0
+            if c1 == 'rouge': p1.wins_as_red += 1
+            else: p1.wins_as_blue += 1
+            # Buts encaissés
+            p1.goals_conceded += s2; p2.goals_conceded += s1
+            # Enregistrement du match
+            match = Match(
+                date=datetime.utcnow(),
+                winner_id=j1 if s1>s2 else j2,
+                loser_id=j2 if s1>s2 else j1,
+                score_winner=max(s1,s2), score_loser=min(s1,s2),
+                winner_color=c1,
+                loser_color=('bleu' if c1=='rouge' else 'rouge')
+            )
+            db.session.add(match)
+            db.session.commit()
+            flash('Match enregistré et ELO mis à jour', 'success')
+            return redirect(url_for('accueil'))
+    return render_template('admin_add_match.html', joueurs=joueurs)
